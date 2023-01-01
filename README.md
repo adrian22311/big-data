@@ -18,3 +18,46 @@ Struktura którą przyjąłem w hadoop'ie wygląda następująco:
 W nifi tworzone są też 2 tabele o nazwach: 
 - youtubeVideoCategories
 - youtubeVideos
+
+
+W tabeli youtubeVideos w zmiennej `tags` tagi rodzielane są za pomocą średników `;` 
+
+
+
+
+
+
+### Struktura tabeli w Hive
+
+1. `default.youtubeVideos`
+
+```
+(
+    id STRING
+    ,publishedAt STRING
+    ,channelId STRING
+    ,description STRING
+    ,channelTitle STRING
+    ,tags STRING
+    ,categoryId STRING
+    ,defaultAudioLanguage STRING
+    ,publicStatsViewable STRING
+    ,viewCount INT
+    ,likeCount INT
+    ,commentCount INT
+    ,fetchTime STRING
+)
+PARTITIONED by ( partition_dt STRING )
+```
+
+2. `default.youtubeVideoCategories`
+
+```
+(
+    id STRING
+    ,title STRING
+    ,assignable STRING
+    ,channelId STRING
+    ,fetchTime STRING
+)
+```
