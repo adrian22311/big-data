@@ -25,7 +25,7 @@ try:
     today = str(date.today())
     yesterday = str(date.today() - timedelta(days=1))
     weekAgo = str(date.today() - timedelta(days=7))
-    period = weekAgo + 'T00 ' + today+'T00'
+    period = weekAgo + 'T00 ' + yesterday + 'T23'
     name = "tags"  # jaka nazwa
 
     path = "/user/project/master/youtubeVideos/"+yesterday+"/test.orc"
