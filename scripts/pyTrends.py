@@ -9,6 +9,8 @@ import sys
 import logging
 import pyarrow as pa
 import pyarrow.parquet as pq
+import random
+import numpy as np
 
 # Logging configuration
 formatter = logging.Formatter(
@@ -29,6 +31,11 @@ try:
     period = weekAgo + 'T00 ' + yesterday + 'T23'
 
     todoPath = "/user/project/master/pyTrends/todo"
+
+    spark = SparkSession.builder.appName("YTProject").getOrCreate()
+    spark.sparkContext.setLogLevel("ERROR")
+    logger.info("Starting spark application")
+
     fs = spark._jvm.org.apache.hadoop.fs.FileSystem.get(
         spark._jsc.hadoopConfiguration())
     list_status = fs.listStatus(spark._jvm.org.apache.hadoop.fs.Path(todoPath))
@@ -58,10 +65,6 @@ try:
         logger.info("CHEATING```````````")
         return np.flip(weiner)
 
-    spark = SparkSession.builder.appName(
-        "YTProject").getOrCreate()
-    spark.sparkContext.setLogLevel("ERROR")
-    logger.info("Starting spark application")
 
     requests_args = {
         'headers': {
@@ -76,7 +79,7 @@ try:
 
         try:
 
-            logger.info("Reading ORC file")
+            logger.info("Reading "+file)
             orc = spark.read.option("header", "true").option(
                 "inferschema", "true").orc(todoPath+"/"+file)
 
@@ -88,13 +91,15 @@ try:
             l = len(tags)
             logger.info("Fetching trends")
 
-            for i, haslo in enumerate(lista):
+            for i, haslo in enumerate(tags):
+                logger.info("Fetching for "+haslo)
                 try:
                     pytrends.build_payload(
                         [haslo], cat=0, timeframe=period, geo='', gprop='')
                     responce = pytrends.interest_over_time()
                     df[haslo] = pytrends.interest_over_time().iloc[:, 0]
                 except Exception as e:
+                    logger.info(e)
                     df[haslo] = generateWeiner()
                 logger.info(str(round((1+i)*100/l))+" % ------------------")
                 time.sleep(12)  # 12
@@ -136,7 +141,7 @@ try:
         except Exception as e:
             logger.error("Error handling file: "+file)
             logger.error(e)
-            
+
 
     logger.info("Ending spark application")
     spark.stop()
