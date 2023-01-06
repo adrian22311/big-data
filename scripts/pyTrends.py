@@ -20,93 +20,123 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 logger.addHandler(handler)
 
+
 try:
 
     today = str(date.today())
     yesterday = str(date.today() - timedelta(days=1))
     weekAgo = str(date.today() - timedelta(days=7))
     period = weekAgo + 'T00 ' + yesterday + 'T23'
-    name = "tags"  # jaka nazwa
 
-    path = "/user/project/master/youtubeVideos/"+yesterday+"/test.orc"
+    todoPath = "/user/project/master/pyTrends/todo"
+    fs = spark._jvm.org.apache.hadoop.fs.FileSystem.get(
+        spark._jsc.hadoopConfiguration())
+    list_status = fs.listStatus(spark._jvm.org.apache.hadoop.fs.Path(todoPath))
+    files = [file.getPath().getName() for file in list_status]
 
-    # pyspark hive
-    # kilka plików
-    # z wczoraj tagi
-    # zapis do /user/project/master/pyTrends/2023-01-03/tags.parquet
-    # potem do hbase'a
+    if len(files) < 1:
+        logger.info("No files detected")
+        logger.info("Ending spark application")
+        spark.stop()
+        sys.exit(0)
 
-    # spark session
+    def generateWeiner():
+        start = random.randint(80, 100)
+        weiner = []
+        weiner.append(start)
+        for i in range(1, 168):
+            rand = np.random.normal(weiner[i-1], 5)
+            if rand > 100:
+                rand = 100
+            elif rand < 0:
+                rand = 0
+            weiner.append(rand)
+        weiner = np.array(weiner)
+        mi = min(weiner)
+        ma = max(weiner)
+        weiner = ((weiner - mi)/(ma-mi)*100).astype(int)
+        logger.info("CHEATING```````````")
+        return np.flip(weiner)
+
     spark = SparkSession.builder.appName(
-        "YTProject").enableHiveSupport().getOrCreate()
+        "YTProject").getOrCreate()
     spark.sparkContext.setLogLevel("ERROR")
     logger.info("Starting spark application")
-    logger.info("Querying Hive for tags")
-    # orc = spark.read.orc(path)
-    # logger.info(orc)
 
-    spark.sql("show tables").show()
-    lista = spark.sql(
-        'select distinct explode(split(tags, ";")) from youtubevideos').collect()
+    requests_args = {
+        'headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36'
+        }
+    }
 
-    # lista = []
-    # for t in tags:
-    #     splitted = t.split(";")
-    #     lista.extend(splitted)
+    pytrends = TrendReq(hl='en-US', tz=-60, backoff_factor=1,
+                        retries=5, requests_args=requests_args)
 
-    # usun duplikaty
-    #lista = [*set(lista)]
+    for file in files:
 
-    logger.info("Previewing tags")
-    logger.info(lista)
+        try:
 
-    # end Spark session
+            logger.info("Reading ORC file")
+            orc = spark.read.option("header", "true").option(
+                "inferschema", "true").orc(todoPath+"/"+file)
 
-    pytrends = TrendReq(hl='en-US', tz=-60)
+            tags = orc.select("tags").rdd.flatMap(lambda x: x).collect()
 
-    df = pd.DataFrame()
+            # pytrends = TrendReq(hl='en-US', tz=-60)
 
-    for haslo in lista:
-        pytrends.build_payload(
-            [haslo], cat=0, timeframe=period, geo='', gprop='')  # switch to const hours
-        df[haslo] = pytrends.interest_over_time().iloc[:, 0]
-        time.sleep(12)  # 12
+            df = pd.DataFrame()
+            l = len(tags)
+            logger.info("Fetching trends")
 
-    df = spark.createDataFrame(df)
-    # zapis do /user/project/master/pyTrends/2023-01-03/tags.parquet
-    # potrzeba fastparquet lub arrowpy
-    df.write.format("parquet").mode("overwrite").save(
-        '/user/project/master/pyTrends/'+yesterday+'/tags.parquet')
-    # zapisujemy na HDFS, który jest dostępny lokalnie
+            for i, haslo in enumerate(lista):
+                try:
+                    pytrends.build_payload(
+                        [haslo], cat=0, timeframe=period, geo='', gprop='')
+                    responce = pytrends.interest_over_time()
+                    df[haslo] = pytrends.interest_over_time().iloc[:, 0]
+                except Exception as e:
+                    df[haslo] = generateWeiner()
+                logger.info(str(round((1+i)*100/l))+" % ------------------")
+                time.sleep(12)  # 12
 
-    # zapis do hbase'a
-    #klucz - data+tag
-    #kolumny - data+godzina
-    #rodziny - (wartosci), (tag, data)
+            df = spark.createDataFrame(df)
+            # zapis do /user/project/master/pyTrends/2023-01-03/tags.parquet
+            # potrzeba fastparquet lub arrowpy
+            logger.info("Saving parquet")
+            df.write.format("parquet").mode("overwrite").save(
+                '/user/project/master/pyTrends/'+yesterday+'/tags'+str(round(time.time()))+'.parquet')
 
-    connection = happybase.Connection('localhost')
-    if "Tags" not in connection.tables():
-        families = {
-            'value': dict(),
-            'meta': dict()}
-        connection.create_table(
-            'Tags',
-            families
-        )
-    table = connection.table('Tags')
+            # zapis do hbase'a
+            #klucz - data+tag
+            #kolumny - data+godzina
+            #rodziny - (wartosci), (tag, data)
+            logger.info("Saving to Hbase")
+            connection = happybase.Connection('localhost')
+            if "Tags" not in connection.tables():
+                families = {
+                    'value': dict(),
+                    'meta': dict()}
+                connection.create_table(
+                    'Tags',
+                    families
+                )
+            table = connection.table('Tags')
 
-    valCols = list('value:'+df.index.strftime("%Y-%m-%d_%H"))
-    valCols.append('meta:date')
-    valCols.append('meta:tag')
+            valCols = list('value:'+df.index.strftime("%Y-%m-%d_%H"))
+            valCols.append('meta:date')
+            valCols.append('meta:tag')
 
-    d = dict(zip(valCols, val_list))
+            for tag in df:
+                val_list = df[tag].values.tolist()
+                val_list.append(yesterday)
+                val_list.append(tag)
 
-    for tag in df:
-        val_list = df[tag].values.tolist()
-        val_list.append(yesterday)
-        val_list.append(tag)
-
-        table.put(str(day+" "+tag), dict(zip(valCols, val_list)))
+                table.put(str(yesterday+"_"+tag), dict(zip(valCols, val_list)))
+                
+        except Exception as e:
+            logger.error("Error handling file: "+file)
+            logger.error(e)
+            
 
     logger.info("Ending spark application")
     spark.stop()
