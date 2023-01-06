@@ -2,7 +2,7 @@
 <template encoding-version="1.3">
     <description></description>
     <groupId>0927ddff-017c-1000-3f08-95a84646cb8e</groupId>
-    <name>YT_v5</name>
+    <name>YT_v6</name>
     <snippet>
         <connections>
             <id>1e000efa-af09-3045-0000-000000000000</id>
@@ -1127,6 +1127,7 @@
 <key>Replacement Value</key>
 <value>CREATE EXTERNAL TABLE IF NOT EXISTS default.youtubeVideos (
     id STRING
+    ,title STRING
     ,published_at STRING
     ,channel_id STRING
     ,description STRING
@@ -2312,7 +2313,7 @@ MSCK Repair Table youtubeVideoCategories;</value>
                     <parentGroupId>5aa6aa9e-771a-389d-0000-000000000000</parentGroupId>
                     <position>
                         <x>280.0</x>
-                        <y>-424.0</y>
+                        <y>-416.0</y>
                     </position>
                     <comments></comments>
                     <concurrentlySchedulableTaskCount>1</concurrentlySchedulableTaskCount>
@@ -2482,7 +2483,7 @@ MSCK Repair Table youtubeVideoCategories;</value>
                             </entry>
                             <entry>
 <key>Replacement Value</key>
-<value>${id}|${published_at}|${channel_id}|${description:replace('$',''):replace('|',''):replace('\n',''):replace('\r',''):replace('"',"'")}|${channel_title:replace('$',''):replace('|',''):replace('\n',''):replace('\r',''):replace('"',"'")}|${tags:replace('$',''):replace('|',''):replace('\n',''):replace('\r',''):replace('"',"'")}|${category_id}|${default_audio_language}|${public_stats_viewable}|${view_count}|${like_count}|${comment_count}|${fetch_time}</value>
+<value>${id}|${title:replace('$',''):replace('|',''):replace('\n',''):replace('\r',''):replace('"',"'")}|${published_at}|${channel_id}|${description:replace('$',''):replace('|',''):replace('\n',''):replace('\r',''):replace('"',"'")}|${channel_title:replace('$',''):replace('|',''):replace('\n',''):replace('\r',''):replace('"',"'")}|${tags:replace('$',''):replace('|',''):replace('\n',''):replace('\r',''):replace('"',"'")}|${category_id}|${default_audio_language}|${public_stats_viewable}|${view_count}|${like_count}|${comment_count}|${fetch_time}</value>
                             </entry>
                             <entry>
 <key>Character Set</key>
@@ -2638,6 +2639,12 @@ MSCK Repair Table youtubeVideoCategories;</value>
 </value>
                             </entry>
                             <entry>
+<key>title</key>
+<value>
+    <name>title</name>
+</value>
+                            </entry>
+                            <entry>
 <key>view_count</key>
 <value>
     <name>view_count</name>
@@ -2711,6 +2718,10 @@ MSCK Repair Table youtubeVideoCategories;</value>
                             <entry>
 <key>tags</key>
 <value>$.snippet.tags</value>
+                            </entry>
+                            <entry>
+<key>title</key>
+<value>$.snippet.title</value>
                             </entry>
                             <entry>
 <key>view_count</key>
@@ -3100,7 +3111,7 @@ MSCK Repair Table youtubeVideoCategories;</value>
                             </entry>
                             <entry>
 <key>Replacement Value</key>
-<value>id|published_at|channel_id|description|channel_title|tags|category_id|default_audio_language|public_stats_viewable|view_count|like_count|comment_count|fetch_time
+<value>id|title|published_at|channel_id|description|channel_title|tags|category_id|default_audio_language|public_stats_viewable|view_count|like_count|comment_count|fetch_time
 </value>
                             </entry>
                             <entry>
@@ -7550,7 +7561,7 @@ Error occurred at: ${now():format("yyyy-MM-dd HH:mm:ss.SSS")}</value>
                     <parentGroupId>c984acdc-4603-3661-0000-000000000000</parentGroupId>
                     <position>
                         <x>744.0</x>
-                        <y>670.6804809570312</y>
+                        <y>664.0</y>
                     </position>
                     <comments></comments>
                     <concurrentlySchedulableTaskCount>1</concurrentlySchedulableTaskCount>
@@ -7576,7 +7587,7 @@ Error occurred at: ${now():format("yyyy-MM-dd HH:mm:ss.SSS")}</value>
                     <parentGroupId>c984acdc-4603-3661-0000-000000000000</parentGroupId>
                     <position>
                         <x>688.0</x>
-                        <y>374.68048095703125</y>
+                        <y>368.0</y>
                     </position>
                     <bundle>
                         <artifact>nifi-update-attribute-nar</artifact>
@@ -9412,5 +9423,5 @@ Error occurred at: ${now():format("yyyy-MM-dd HH:mm:ss.SSS")}</value>
             <variables/>
         </processGroups>
     </snippet>
-    <timestamp>01/05/2023 23:17:22 UTC</timestamp>
+    <timestamp>01/06/2023 21:35:01 UTC</timestamp>
 </template>
