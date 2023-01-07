@@ -63,7 +63,6 @@ try:
         mi = min(weiner)
         ma = max(weiner)
         weiner = ((weiner - mi)/(ma-mi)*100).astype(int)
-        logger.info("CHEATING```````````")
         return np.flip(weiner)
 
 
@@ -113,10 +112,7 @@ try:
                     logger.info(e)
                     df[safeStr] = generateWeiner()
                 logger.info(str(round((1+i)*100/l))+" % ------------------")
-                time.sleep(12)  # 12
-                if i >1:
-                    break
-            
+                time.sleep(12)  # 12        
             
 
             dfSpark = spark.createDataFrame(df)
