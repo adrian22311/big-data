@@ -93,22 +93,36 @@ try:
 
             for i, haslo in enumerate(tags):
                 logger.info("Fetching for "+haslo)
+                safeStr=haslo.replace(" ", "_")
+                safeStr=safeStr.replace(",", "")
+                safeStr=safeStr.replace(";", "")
+                safeStr=safeStr.replace("{", "")
+                safeStr=safeStr.replace("}", "")
+                safeStr=safeStr.replace("(", "")
+                safeStr=safeStr.replace(")", "")
+                safeStr=safeStr.replace("\n", "_")
+                safeStr=safeStr.replace("\t", "__")
+                safeStr=safeStr.replace("=", "-")
                 try:
                     pytrends.build_payload(
                         [haslo], cat=0, timeframe=period, geo='', gprop='')
-                    responce = pytrends.interest_over_time()
-                    df[haslo] = pytrends.interest_over_time().iloc[:, 0]
+
+                    df[safeStr] = pytrends.interest_over_time().iloc[:, 0]
                 except Exception as e:
                     logger.info(e)
-                    df[haslo] = generateWeiner()
+                    df[safeStr] = generateWeiner()
                 logger.info(str(round((1+i)*100/l))+" % ------------------")
                 time.sleep(12)  # 12
+                if i >1:
+                    break
+            
+            
 
-            df = spark.createDataFrame(df)
+            dfSpark = spark.createDataFrame(df)
             # zapis do /user/project/master/pyTrends/2023-01-03/tags.parquet
             # potrzeba fastparquet lub arrowpy
             logger.info("Saving parquet")
-            df.write.format("parquet").mode("overwrite").save(
+            dfSpark.write.format("parquet").mode("overwrite").save(
                 '/user/project/master/pyTrends/'+yesterday+'/tags'+str(round(time.time()))+'.parquet')
 
             # zapis do hbase'a
@@ -117,26 +131,33 @@ try:
             #rodziny - (wartosci), (tag, data)
             logger.info("Saving to Hbase")
             connection = happybase.Connection('localhost')
-            if "Tags" not in connection.tables():
-                families = {
-                    'value': dict(),
-                    'meta': dict()}
-                connection.create_table(
-                    'Tags',
-                    families
-                )
+            # if "Tags" not in connection.tables():
+            #     families = {
+            #         'value': dict(),
+            #         'meta': dict()}
+            #     connection.create_table(
+            #         'Tags',
+            #         families
+            #     )
             table = connection.table('Tags')
 
-            valCols = list('value:'+df.index.strftime("%Y-%m-%d_%H"))
-            valCols.append('meta:date')
-            valCols.append('meta:tag')
+            cols = ('value:'+df.index.strftime("%Y-%m-%d_%H")).tolist()
+            valCols=[]
+            for c in cols:
+                valCols.append(c.encode('UTF-8'))
+            valCols.append('meta:date'.encode('UTF-8'))
+            valCols.append('meta:tag'.encode('UTF-8'))
 
             for tag in df:
-                val_list = df[tag].values.tolist()
-                val_list.append(yesterday)
-                val_list.append(tag)
+                val_list = []
+                for v in df[tag].values.tolist():
+                    val_list.append(str(v).encode('UTF-8'))
+                val_list.append(yesterday.encode('UTF-8'))
+                val_list.append(tag.encode('UTF-8'))
+                
+                dic = dict(zip(valCols, val_list))
 
-                table.put(str(yesterday+"_"+tag), dict(zip(valCols, val_list)))
+                table.put(str(yesterday+"_"+tag).encode('UTF-8'), dic)
                 
         except Exception as e:
             logger.error("Error handling file: "+file)
