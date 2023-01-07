@@ -26,7 +26,6 @@ logger.addHandler(handler)
 
 try:
 
-    today = str(date.today())
     yesterday = str(date.today() - timedelta(days=1))
     weekAgo = str(date.today() - timedelta(days=7))
     period = weekAgo + 'T00 ' + yesterday + 'T23'
@@ -37,8 +36,7 @@ try:
     spark.sparkContext.setLogLevel("ERROR")
     logger.info("Starting spark application")
 
-    fs = spark._jvm.org.apache.hadoop.fs.FileSystem.get(
-        spark._jsc.hadoopConfiguration())
+    fs = spark._jvm.org.apache.hadoop.fs.FileSystem.get(spark._jsc.hadoopConfiguration())
     list_status = fs.listStatus(spark._jvm.org.apache.hadoop.fs.Path(todoPath))
     files = [file.getPath().getName() for file in list_status]
 
@@ -72,6 +70,7 @@ try:
         }
     }
 
+    logger.info("Connecting pyTrends")
     pytrends = TrendReq(hl='en-US', tz=-60, backoff_factor=1,
                         retries=5, requests_args=requests_args)
 
@@ -80,12 +79,9 @@ try:
         try:
 
             logger.info("Reading "+file)
-            orc = spark.read.option("header", "true").option(
-                "inferschema", "true").orc(todoPath+"/"+file)
+            orc = spark.read.option("header", "true").option("inferschema", "true").orc(todoPath+"/"+file)
 
             tags = orc.select("tags").rdd.flatMap(lambda x: x).collect()
-
-            
 
             df = pd.DataFrame()
             l = len(tags)
@@ -104,14 +100,12 @@ try:
                 safeStr=safeStr.replace("\t", "__")
                 safeStr=safeStr.replace("=", "-")
                 try:
-                    pytrends.build_payload(
-                        [haslo], cat=0, timeframe=period, geo='', gprop='')
-
+                    pytrends.build_payload([haslo], cat=0, timeframe=period, geo='', gprop='')
                     df[safeStr] = pytrends.interest_over_time().iloc[:, 0]
                 except Exception as e:
                     logger.info(e)
                     df[safeStr] = generateWeiner()
-                logger.info(str(round((1+i)*100/l))+" % ------------------")
+                logger.info(str(round((1+i)*100/l))+" %")
                 time.sleep(12)  # 12        
             
 
@@ -119,8 +113,7 @@ try:
             # zapis do /user/project/master/pyTrends/2023-01-03/tags.parquet
             # potrzeba fastparquet lub arrowpy
             logger.info("Saving parquet")
-            dfSpark.write.format("parquet").mode("overwrite").save(
-                '/user/project/master/pyTrends/'+yesterday+'/tags'+str(round(time.time()))+'.parquet')
+            dfSpark.write.format("parquet").mode("overwrite").save('/user/project/master/pyTrends/'+yesterday+'/tags'+str(round(time.time()))+'.parquet')
 
             # zapis do hbase'a
             #klucz - data+tag
