@@ -11,6 +11,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import random
 import numpy as np
+import subprocess
 
 # Logging configuration
 formatter = logging.Formatter(
@@ -85,7 +86,7 @@ try:
 
             tags = orc.select("tags").rdd.flatMap(lambda x: x).collect()
 
-            # pytrends = TrendReq(hl='en-US', tz=-60)
+            
 
             df = pd.DataFrame()
             l = len(tags)
@@ -131,14 +132,6 @@ try:
             #rodziny - (wartosci), (tag, data)
             logger.info("Saving to Hbase")
             connection = happybase.Connection('localhost')
-            # if "Tags" not in connection.tables():
-            #     families = {
-            #         'value': dict(),
-            #         'meta': dict()}
-            #     connection.create_table(
-            #         'Tags',
-            #         families
-            #     )
             table = connection.table('Tags')
 
             cols = ('value:'+df.index.strftime("%Y-%m-%d_%H")).tolist()
@@ -159,10 +152,18 @@ try:
 
                 table.put(str(yesterday+"_"+tag).encode('UTF-8'), dic)
                 
+            logger.info("Deleting "+file)
+            fs.delete(todoPath+"/"+file,True)
+        
         except Exception as e:
             logger.error("Error handling file: "+file)
             logger.error(e)
-
+            
+            logger.info("Quarantining "+file)
+            proc = subprocess.Popen(["hdfs", "dfs", "-mkdir", '/user/project/master/pyTrends/quarantine/'+yesterday])
+            proc.communicate()
+            proc = subprocess.Popen(["hdfs", "dfs", "-mv", todoPath+"/"+file, '/user/project/master/pyTrends/quarantine/'+yesterday+"/"+file])
+            proc.communicate()
 
     logger.info("Ending spark application")
     spark.stop()
