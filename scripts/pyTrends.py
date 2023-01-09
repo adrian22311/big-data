@@ -36,7 +36,8 @@ try:
     spark.sparkContext.setLogLevel("ERROR")
     logger.info("Starting spark application")
 
-    fs = spark._jvm.org.apache.hadoop.fs.FileSystem.get(spark._jsc.hadoopConfiguration())
+    fs = spark._jvm.org.apache.hadoop.fs.FileSystem.get(
+        spark._jsc.hadoopConfiguration())
     list_status = fs.listStatus(spark._jvm.org.apache.hadoop.fs.Path(todoPath))
     files = [file.getPath().getName() for file in list_status]
 
@@ -45,24 +46,6 @@ try:
         logger.info("Ending spark application")
         spark.stop()
         sys.exit(0)
-
-    def generateWeiner():
-        start = random.randint(80, 100)
-        weiner = []
-        weiner.append(start)
-        for i in range(1, 168):
-            rand = np.random.normal(weiner[i-1], 5)
-            if rand > 100:
-                rand = 100
-            elif rand < 0:
-                rand = 0
-            weiner.append(rand)
-        weiner = np.array(weiner)
-        mi = min(weiner)
-        ma = max(weiner)
-        weiner = ((weiner - mi)/(ma-mi)*100).astype(int)
-        return np.flip(weiner)
-
 
     requests_args = {
         'headers': {
@@ -79,7 +62,8 @@ try:
         try:
 
             logger.info("Reading "+file)
-            orc = spark.read.option("header", "true").option("inferschema", "true").orc(todoPath+"/"+file)
+            orc = spark.read.option("header", "true").option(
+                "inferschema", "true").orc(todoPath+"/"+file)
 
             tags = orc.select("tags").rdd.flatMap(lambda x: x).collect()
 
@@ -89,31 +73,32 @@ try:
 
             for i, haslo in enumerate(tags):
                 logger.info("Fetching for "+haslo)
-                safeStr=haslo.replace(" ", "_")
-                safeStr=safeStr.replace(",", "")
-                safeStr=safeStr.replace(";", "")
-                safeStr=safeStr.replace("{", "")
-                safeStr=safeStr.replace("}", "")
-                safeStr=safeStr.replace("(", "")
-                safeStr=safeStr.replace(")", "")
-                safeStr=safeStr.replace("\n", "_")
-                safeStr=safeStr.replace("\t", "__")
-                safeStr=safeStr.replace("=", "-")
+                safeStr = haslo.replace(" ", "_")
+                safeStr = safeStr.replace(",", "")
+                safeStr = safeStr.replace(";", "")
+                safeStr = safeStr.replace("{", "")
+                safeStr = safeStr.replace("}", "")
+                safeStr = safeStr.replace("(", "")
+                safeStr = safeStr.replace(")", "")
+                safeStr = safeStr.replace("\n", "_")
+                safeStr = safeStr.replace("\t", "__")
+                safeStr = safeStr.replace("=", "-")
                 try:
-                    pytrends.build_payload([haslo], cat=0, timeframe=period, geo='', gprop='')
+                    pytrends.build_payload(
+                        [haslo], cat=0, timeframe=period, geo='', gprop='')
                     df[safeStr] = pytrends.interest_over_time().iloc[:, 0]
                 except Exception as e:
                     logger.info(e)
-                    df[safeStr] = generateWeiner()
+                    logger.info("Skipping " + haslo)
                 logger.info(str(round((1+i)*100/l))+" %")
-                time.sleep(12)  # 12        
-            
+                time.sleep(12)  # 12
 
             dfSpark = spark.createDataFrame(df)
             # zapis do /user/project/master/pyTrends/2023-01-03/tags.parquet
             # potrzeba fastparquet lub arrowpy
             logger.info("Saving parquet")
-            dfSpark.write.format("parquet").mode("overwrite").save('/user/project/master/pyTrends/'+yesterday+'/tags'+str(round(time.time()))+'.parquet')
+            dfSpark.write.format("parquet").mode("overwrite").save(
+                '/user/project/master/pyTrends/'+yesterday+'/tags'+str(round(time.time()))+'.parquet')
 
             # zapis do hbase'a
             #klucz - data+tag
@@ -124,7 +109,7 @@ try:
             table = connection.table('Tags')
 
             cols = ('value:'+df.index.strftime("%Y-%m-%d_%H")).tolist()
-            valCols=[]
+            valCols = []
             for c in cols:
                 valCols.append(c.encode('UTF-8'))
             valCols.append('meta:date'.encode('UTF-8'))
@@ -136,22 +121,24 @@ try:
                     val_list.append(str(v).encode('UTF-8'))
                 val_list.append(yesterday.encode('UTF-8'))
                 val_list.append(tag.encode('UTF-8'))
-                
+
                 dic = dict(zip(valCols, val_list))
 
                 table.put(str(yesterday+"_"+tag).encode('UTF-8'), dic)
-                
+
             logger.info("Deleting "+file)
-            fs.delete(todoPath+"/"+file,True)
-        
+            fs.delete(todoPath+"/"+file, True)
+
         except Exception as e:
             logger.error("Error handling file: "+file)
             logger.error(e)
-            
+
             logger.info("Quarantining "+file)
-            proc = subprocess.Popen(["hdfs", "dfs", "-mkdir", '/user/project/master/pyTrends/quarantine/'+yesterday])
+            proc = subprocess.Popen(
+                ["hdfs", "dfs", "-mkdir", '/user/project/master/pyTrends/quarantine/'+yesterday])
             proc.communicate()
-            proc = subprocess.Popen(["hdfs", "dfs", "-mv", todoPath+"/"+file, '/user/project/master/pyTrends/quarantine/'+yesterday+"/"+file])
+            proc = subprocess.Popen(["hdfs", "dfs", "-mv", todoPath+"/"+file,
+                                    '/user/project/master/pyTrends/quarantine/'+yesterday+"/"+file])
             proc.communicate()
 
     logger.info("Ending spark application")
